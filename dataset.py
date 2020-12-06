@@ -34,57 +34,55 @@ class DatasetModule(pl.LightningDataModule):
         self.val_ratio = val_ratio
         self.batch_size = batch_size
 
-    def read_data(self, class_list, campaign, df, target=None):
-        labels = pd.DataFrame()
-        for class_type in class_list:
-            events = uproot.open(
-                f"{self.root_path}/merged/{campaign}/{class_type}.root")
-            tree = events[events.keys()[0]]
-            features = tree.keys()
-            tree_pd = tree.pandas.df(features)
-            df = pd.concat([df, tree_pd], ignore_index=True)
-            if target is not None:
-                labels = pd.concat([labels, pd.DataFrame(
-                    {"target": target*np.ones(len(tree_pd))})], ignore_index=True)
-        return df, labels
+    # def read_data(self, class_list, campaign, df, target=None):
+    #     labels = pd.DataFrame()
+    #     for class_type in class_list:
+    #         events = uproot.open(
+    #             f"{self.root_path}/merged/{campaign}/{class_type}.root")
+    #         tree = events[events.keys()[0]]
+    #         features = tree.keys()
+    #         tree_pd = tree.pandas.df(features)
+    #         df = pd.concat([df, tree_pd], ignore_index=True)
+    #         if target is not None:
+    #             labels = pd.concat([labels, pd.DataFrame(
+    #                 {"target": target*np.ones(len(tree_pd))})], ignore_index=True)
+    #     return df, labels
 
     def prepare_data(self):
         '''
-        function to check data directory and read features using the channels and the arrays,
-        then preprocess the data
-
-        : store data in a numpy array of size (total_length x (num_features))
-        : store target(0/1) in a numpy array of size (total_length x 1)
-        : store id similarly
-
         return:
-            sig_df: pandas of all mc signals
-            bkg_df: pandas of all mc backgrounds
-            sig_ones: a pandas df with "target" columns, containing total number of sig of ones
-            bkg_ones: a pandas df with "target" columns, containing total number of bkg of zeros
+            sig_df: pandas of all mc signals [take all features]
+            bkg_df: pandas of all mc backgrounds [take all features]
+            sig_zeros: a pandas df with "target" columns, containing total number of sig of ones
+            bkg_labels: a pandas df with "target" columns, containing labels of bkg
+            E.g say our bkg_list = [diboson, wjets, top], then all diboson have target 1, wjets have 2 and top has 3
+            as target
+            
+            Note: instead of 0/1 we have 0 for sig and 1,2... for bkg
         '''
-        print("Reading Dataset...")
-        sig_df = pd.DataFrame()
-        bkg_df = pd.DataFrame()
-        bkg_labels = pd.DataFrame()
+        # print("Reading Dataset...")
+        # sig_df = pd.DataFrame()
+        # bkg_df = pd.DataFrame()
+        # bkg_labels = pd.DataFrame()
 
-        for campaign in self.campaigns:
-            print(f"Reading campaign: {campaign}...")
-            sig_df, _ = self.read_data(self.sig_list, campaign, sig_df)
-            for i, bkg in self.bkg_list:
-                bkg_df, tree_label = self.read_data(
-                    [bkg], campaign, bkg_df, i+1)
-                bkg_labels = pd.concat(
-                    [bkg_labels, tree_labels], ignore_index=True)
-        self.sig_ones = pd.DataFrame({"target": np.ones(len(sig_df))})
-        self.sig = np.concatenate(
-            (sig_df.to_numpy(), sig_ones.to_numpy()), axis=1)
-        self.bkg = np.concatenate(
-            (bkg_df.to_numpy(), bkg_labels.to_numpy()), axis=1)
+        # for campaign in self.campaigns:
+        #     print(f"Reading campaign: {campaign}...")
+        #     sig_df, _ = self.read_data(self.sig_list, campaign, sig_df)
+        #     for i, bkg in enumerate(self.bkg_list):
+        #         bkg_df, tree_labels = self.read_data(
+        #             [bkg], campaign, bkg_df, i+1)
+        #         bkg_labels = pd.concat(
+        #             [bkg_labels, tree_labels], ignore_index=True)
+        # sig_ones = pd.DataFrame({"target": np.ones(len(sig_df))})
+        # self.sig = np.concatenate(
+        #     (sig_df.to_numpy(), sig_ones.to_numpy()), axis=1)
+        # self.bkg = np.concatenate(
+        #     (bkg_df.to_numpy(), bkg_labels.to_numpy()), axis=1)
 
-        print(f"No. of signal samples: {self.sig.shape}")
-        print(f"No. of background samples: {self.bkg.shape}")
-        self.input_size = self.sig.shape[0]
+        # print(f"No. of signal samples: {self.sig.shape}")
+        # print(f"No. of background samples: {self.bkg.shape}")
+        # self.input_size = self.sig.shape[0]
+        pass
 
     def setup(self, stage):
         '''
@@ -93,11 +91,11 @@ class DatasetModule(pl.LightningDataModule):
         if self.norm_array:
             self.sig[:, :-1] = norweight(self.sig[:, :-1], self.sig_sum)
             self.bkg[:, :-1] = norweight(self.bkg[:, :-1], self.bkg_sum)
-        np.shuffle(self.sig)
-        np.shuffle(self.bkg)
+        np.random.shuffle(self.sig)
+        np.random.shuffle(self.bkg)
         bkg_train, bkg_val, bkg_test = self.split_sets(
             self.bkg, self.val_ratio, self.test_ratio)
-        _, _, _ sig_test = self.split_sets(self.sig)
+        _, _, sig_test = self.split_sets(self.sig)
         self.train = bkg_train
         self.val = bkg_val
         self.test = ConcatDataset([bkg_test, sig_test])

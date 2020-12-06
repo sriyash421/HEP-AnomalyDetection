@@ -2,11 +2,10 @@ import os
 import torch
 import argparse
 import pytorch_lightning as pl
-from utils import read_config, get_early_stopper, get_checkpoint_callback, final_logs, print_dict
+from utils import read_config, get_early_stopper, get_checkpoint_callback, print_dict
 from train import Model
 from dataset import DatasetModule
 import numpy as np
-from models.model import pDNN
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--config", default="config.ini")
@@ -38,6 +37,7 @@ if __name__ == "__main__":
                                 test_ratio=params["TEST_SPLIT"],
                                 val_ratio=params["VAL_SPLIT"],
                                 batch_size=params["BATCH_SIZE"])
+        dataset.prepare_data()
 
         early_stopping, logger, model_checkpoint = None, None, None
         if params["EARLY_STOP"]:

@@ -31,8 +31,8 @@ class Model(pl.LightningModule):
         super(pl.LightningModule, self).__init__()
         self.classifier = Classifier(
             classifier_nodes, dropout, activation, input_size, output_size)
-        self.autoencoder = AutoEncoder(
-            encoder_nodes, activation, input_size+sum(classifier_nodes)+output_size)
+        self.encoder = AutoEncoder(
+            encoder_nodes, dropout, activation, input_size+sum(classifier_nodes)+output_size)
         self.m = encoder_nodes[-1]
         self.example_input_array = torch.ones((1, input_size))
         self.momentum = momentum
@@ -42,8 +42,6 @@ class Model(pl.LightningModule):
         self.sig_class_weight = sig_class_weight
         self.bkg_class_weight = bkg_class_weight
         self.optimizer_ = optimizer
-        self.loss_fn = loss_fn
-        self.id_dict = id_dict
         self.encoder_loss_fn = torch.nn.MSELoss()
         self.classifier_loss_fn = torch.nn.NLLLoss()
         self.K = K
@@ -58,19 +56,24 @@ class Model(pl.LightningModule):
 
     def forward(self, input):
         '''get output'''
+        print("input",input.shape)
         predictions, features = self.classifier(input)
+        print("predictions", predictions.shape)
+        print("features", features.shape)
         recon_features, latent_rep = self.encoder(features.detach())
+        print("recon_features",recon_features.shape)
+        print("latent_rep",latent_rep.shape)
         return predictions, features, recon_features, latent_rep
 
     def configure_optimizers(self):
         '''create optimizer and scheduler'''
         optimizer = None
         if self.optimizer_ == 'adam':
-            optimizer = torch.optim.Adam(self.dnn.parameters(
+            optimizer = torch.optim.Adam(self.parameters(
             ), lr=self.learn_rate, betas=[self.momentum, 0.999])
         else:
             optimizer = torch.optim.SGD(
-                self.dnn.parameters(), lr=self.learn_rate, momentum=self.momentum, nesterov=self.nesterov)
+                self.parameters(), lr=self.learn_rate, momentum=self.momentum, nesterov=self.nesterov)
 
         def scheduler_fn(epoch): return 1./(1+epoch*self.learn_rate_decay)
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, scheduler_fn)
@@ -175,7 +178,7 @@ class Model(pl.LightningModule):
         avg_test_rloss = torch.stack([output['test_reco_loss']
                                     for output in outputs]).mean()
         test_metrics = {'average_test_loss': avg_test_loss,
-                        'average_test_acc': avg_test_acc.
+                        'average_test_acc': avg_test_acc,
                         'avg_test_closs': avg_test_closs,
                         'avg_test_rloss': avg_test_rloss}
         self.test_features = torch.cat(self.test_features, axis=0)

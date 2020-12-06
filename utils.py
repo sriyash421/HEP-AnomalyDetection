@@ -28,8 +28,13 @@ def read_config(filename="config.ini"):
     config["JOB_NAME"] = str(temp["job_name"])
     config["JOB_TYPE"] = str(temp["job_type"])
     # if config["JOB_TYPE"] == "train":
+    count = 0
+    if os.path.exists(temp["save_dir"]) :
+        for i in os.listdir(temp["save_dir"]):
+            if config["JOB_NAME"] in i:
+                count+=1
     config["SAVE_DIR"] = os.path.join(
-        str(temp["save_dir"]), config["JOB_NAME"]+f"_{datetime.now()}".replace(" ", "_"))
+        str(temp["save_dir"]), config["JOB_NAME"]+f"_{count}")
     config["LOG_DIR"] = os.path.join(config["SAVE_DIR"], "logs")
     config["CHECKPOINTS_DIR"] = os.path.join(
         config["SAVE_DIR"], "checkpoints")
@@ -62,10 +67,11 @@ def read_config(filename="config.ini"):
     config["SAVE_MODEL"] = True if temp["save_model"] == "true" else False
     config["CHECK_EPOCH"] = True if temp["check_model_epoch"] == "true" else False
     
+    config["EPOCHS"] = int(temp["epochs"])
     config["MOMENTUM"] = float(temp["momentum"])
     config["NESTEROV"] = True if temp["nesterov"] == "true" else False
     config["LEARN_RATE"] = float(temp["learn_rate"])
-    config["LR_DECAY"] = float(temp["learn_rate_decay"])
+    config["LEARN_RATE_DECAY"] = float(temp["learn_rate_decay"])
     config["SIG_CLASS_WEIGHT"] = float(temp["sig_class_weight"])
     config["BKG_CLASS_WEIGHT"] = float(temp["bkg_class_weight"])
     config["OPTIMIZER"] = str(temp["optimizer"])
