@@ -57,32 +57,40 @@ class DatasetModule(pl.LightningDataModule):
             bkg_labels: a pandas df with "target" columns, containing labels of bkg
             E.g say our bkg_list = [diboson, wjets, top], then all diboson have target 1, wjets have 2 and top has 3
             as target
-            
+
             Note: instead of 0/1 we have 0 for sig and 1,2... for bkg
         '''
-        # print("Reading Dataset...")
-        # sig_df = pd.DataFrame()
-        # bkg_df = pd.DataFrame()
-        # bkg_labels = pd.DataFrame()
+        print("Reading Dataset...")
+        sig_df = pd.DataFrame()
+        bkg_df = pd.DataFrame()
 
-        # for campaign in self.campaigns:
-        #     print(f"Reading campaign: {campaign}...")
-        #     sig_df, _ = self.read_data(self.sig_list, campaign, sig_df)
-        #     for i, bkg in enumerate(self.bkg_list):
-        #         bkg_df, tree_labels = self.read_data(
-        #             [bkg], campaign, bkg_df, i+1)
-        #         bkg_labels = pd.concat(
-        #             [bkg_labels, tree_labels], ignore_index=True)
-        # sig_ones = pd.DataFrame({"target": np.ones(len(sig_df))})
-        # self.sig = np.concatenate(
-        #     (sig_df.to_numpy(), sig_ones.to_numpy()), axis=1)
-        # self.bkg = np.concatenate(
-        #     (bkg_df.to_numpy(), bkg_labels.to_numpy()), axis=1)
+        for campaign in self.campaigns:
+            print(f"Reading campaign: {campaign}...")
+            for i,bkg in enumerate(self.bkg_list):
+                events = uproot.open(
+                    f"{self.root_path}/merged/{campaign}/{bkg}.root"
+                )
+                tree = events[events.keys()[0]]
+                features = tree.keys()
+                tree_pd = tree.pandas.df(self.selected_features)
+                tree_labels = pd.DataFrame({"target": np.ones(len(tree_pd) * (i+1))})
+                tree_pd = pd.concat([tree_pd, tree_labels], axis=1)
+                bkg_df = pd.concat([bkg_df, tree_pd], ignore_index=True)
 
-        # print(f"No. of signal samples: {self.sig.shape}")
-        # print(f"No. of background samples: {self.bkg.shape}")
-        # self.input_size = self.sig.shape[0]
-        pass
+            for j, sig in enumerate(self.sig_list):
+                events = uproot.open(
+                    f"{self.root_path}/merged/{campaign}/{sig}.root"
+                )
+                tree = events[events.keys()[0]]
+                features = tree.keys()
+                tree_pd = tree.pandas.df(self.selected_features)
+                tree_labels = pd.DataFrame({"target": np.zeros(len(tree_pd))})
+                tree_pd = pd.concat([tree_pd, tree_labels], axis=1)
+                sig_df = pd.concat([sig_df, tree_pd], ignore_index=True)
+            return sig_df, bkg_df, sig_df["target"].to_frame(), bkg_df["target"].to_frame()
+
+
+
 
     def setup(self, stage):
         '''
@@ -104,7 +112,7 @@ class DatasetModule(pl.LightningDataModule):
 
     def split_sets(self, data, val_ratio=0, test_ratio=1):
         data = np.array(data, dtype=np.float32)
-    
+
         features_tensor = torch.from_numpy(data[:, :-1])
         target = torch.from_numpy(data[:, -1])
         total_size = features_tensor.shape[0]
