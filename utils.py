@@ -29,10 +29,10 @@ def read_config(filename="config.ini"):
     config["JOB_TYPE"] = str(temp["job_type"])
     # if config["JOB_TYPE"] == "train":
     count = 0
-    if os.path.exists(temp["save_dir"]) :
+    if os.path.exists(temp["save_dir"]):
         for i in os.listdir(temp["save_dir"]):
             if config["JOB_NAME"] in i:
-                count+=1
+                count += 1
     config["SAVE_DIR"] = os.path.join(
         str(temp["save_dir"]), config["JOB_NAME"]+f"_{count}")
     config["LOG_DIR"] = os.path.join(config["SAVE_DIR"], "logs")
@@ -44,6 +44,7 @@ def read_config(filename="config.ini"):
     #     config["LOG_DIR"] = os.path.join(config["RESULTS_DIR"], "logs")
 
     config["ROOT_PATH"] = str(temp["root_path"])
+    config["NUM_FEATURES"] = int(temp["num_features"])
     config["CAMPAIGN"] = list(json.loads(str(temp["campaigns"])))
     config["CHANNEL"] = str(temp["channel"])
     config["NORM_ARRAY"] = True if temp["norm_array"] == "true" else False
@@ -54,19 +55,19 @@ def read_config(filename="config.ini"):
     config["TEST_SPLIT"] = float(temp["test_rate"])
     config["VAL_SPLIT"] = float(temp["val_split"])
     config["BATCH_SIZE"] = int(temp["batch_size"])
-    
+
     config["EARLY_STOP"] = True if temp["use_early_stop"] == "true" else False
     config["ES_MONITOR"] = str(temp["early_stop_monitor"])
     config["ES_DELTA"] = float(temp["early_stop_min_delta"])
     config["ES_PATIENCE"] = int(temp["early_stop_patience"])
     config["ES_MODE"] = str(temp["early_stop_mode"])
     config["ES_RESTORE"] = True if temp["early_stop_restore_best_weights"] == "true" else False
-    
+
     config["SAVE_TB_LOGS"] = True if temp["save_tb_logs"] == "true" else False
 
     config["SAVE_MODEL"] = True if temp["save_model"] == "true" else False
     config["CHECK_EPOCH"] = True if temp["check_model_epoch"] == "true" else False
-    
+
     config["EPOCHS"] = int(temp["epochs"])
     config["MOMENTUM"] = float(temp["momentum"])
     config["NESTEROV"] = True if temp["nesterov"] == "true" else False
@@ -80,7 +81,7 @@ def read_config(filename="config.ini"):
     config["DROPOUT"] = float(temp["dropout_rate"])
     config["ACTIVATION"] = str(temp["activation_fn"])
     config["K"] = int(temp["k_value"])
-    
+
     print_dict(config, "Config")
     return config
 

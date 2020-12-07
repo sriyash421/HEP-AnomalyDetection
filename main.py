@@ -25,7 +25,7 @@ if __name__ == "__main__":
             os.makedirs(params["LOG_DIR"])
         if not os.path.exists(params["CHECKPOINTS_DIR"]):
             os.makedirs(params["CHECKPOINTS_DIR"])
-        
+
         dataset = DatasetModule(root_path=params["ROOT_PATH"],
                                 campaigns=params["CAMPAIGN"],
                                 channel=params["CHANNEL"],
@@ -37,7 +37,6 @@ if __name__ == "__main__":
                                 test_ratio=params["TEST_SPLIT"],
                                 val_ratio=params["VAL_SPLIT"],
                                 batch_size=params["BATCH_SIZE"])
-        dataset.prepare_data()
 
         early_stopping, logger, model_checkpoint = None, None, None
         if params["EARLY_STOP"]:
@@ -64,17 +63,23 @@ if __name__ == "__main__":
             encoder_nodes=params["ENCODER_NODES"],
             dropout=params["DROPOUT"],
             activation=params["ACTIVATION"],
-            input_size=dataset.input_size,
+            input_size=params["NUM_FEATURES"],
             output_size=len(params["BKG_LIST"]),
             save_tb_logs=params["SAVE_TB_LOGS"],
             log_path=params["LOG_DIR"],
-            K=params["K"],
+            K=params["K"]
         )
 
-        trainer = pl.Trainer(early_stop_callback=early_stopping,
-                             checkpoint_callback=model_checkpoint,
+        trainer = pl.Trainer(callbacks=[early_stopping,
+                                        model_checkpoint],
                              logger=logger,
                              max_epochs=params["EPOCHS"],
-                             gpus=gpus)
+                             gpus=gpus,
+                             #  gradient_clip_val=1.0,
+                             track_grad_norm=2,
+                             #  print_nan_grads=True
+                             )
         '''training the model'''
         trainer.fit(model, dataset)
+        result = trainer.test()
+        print(result)

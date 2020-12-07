@@ -11,28 +11,34 @@ class Classifier(nn.Module):
             self.activation_fn = nn.Tanh()
         elif activation == 'relu':
             self.activation_fn = nn.ReLU(True)
-        self.models = [nn.Sequential(*[nn.Linear(input_size, self.nodes[0]), self.activation_fn, nn.Dropout(p=dropout)])]
+        self.models = [nn.Sequential(
+            *[nn.Linear(input_size, self.nodes[0]), self.activation_fn, nn.Dropout(p=dropout)])]
         for i in range(len(nodes)-1):
-            self.models.append(nn.Sequential(*[nn.Linear(self.nodes[i], self.nodes[i+1]), self.activation_fn, nn.Dropout(p=dropout)]))
-        self.models.append(nn.Sequential(*[nn.Linear(self.nodes[-1], output_size), nn.Softmax()]))
-
-        for model in self.models :
-            model.apply(self.init_weights)
+            self.models.append(nn.Sequential(
+                *[nn.Linear(self.nodes[i], self.nodes[i+1]), self.activation_fn, nn.Dropout(p=dropout)]))
+        self.output_layer = nn.Linear(self.nodes[-1], output_size)
+        self.model = nn.Sequential(*self.models)
+        self.softmax = torch.nn.Softmax()
+        self.model.apply(self.init_weights)
+        self.output_layer.apply(self.init_weights)
 
     def init_weights(self, param):
         if type(param) == nn.Linear:
             torch.nn.init.xavier_uniform_(param.weight.data)
 
-    def forward(self, x):
-        outputs = []
+    def forward(self, inputs):
+        outputs = [self.activation_fn(inputs)]
         for layer in self.models:
-            x = layer(x)
-            outputs.append(x)
+            inputs = layer(inputs)
+            outputs.append(inputs)
+        inputs = self.output_layer(inputs)
+        outputs.append(self.activation_fn(inputs))
         outputs = torch.cat(outputs, axis=1)
-        return x, outputs
+        return inputs, outputs.detach()
+
 
 class AutoEncoder(nn.Module):
-    def __init__(self, nodes,dropout, activation, input_size):
+    def __init__(self, nodes, dropout, activation, input_size):
         super(AutoEncoder, self).__init__()
         self.nodes = nodes
         self.input_size = input_size
@@ -46,7 +52,7 @@ class AutoEncoder(nn.Module):
         for i in range(len(nodes)-1):
             self.modules_downsampling.extend([nn.Linear(
                 self.nodes[i], self.nodes[i+1]), self.activation_fn, nn.Dropout(p=dropout)])
-        
+
         self.modules_upsampling = []
         for i in range(len(nodes)-1):
             self.modules_upsampling.extend([nn.Linear(
@@ -65,4 +71,3 @@ class AutoEncoder(nn.Module):
     def forward(self, x):
         latent_rep = self.downsampling(x)
         return self.upsampling(latent_rep), latent_rep
-        
