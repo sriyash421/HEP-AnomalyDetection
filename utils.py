@@ -1,3 +1,5 @@
+from tqdm import trange
+from torch.utils.data import TensorDataset, DataLoader
 import os
 import json
 from configparser import ConfigParser
@@ -112,3 +114,25 @@ def get_checkpoint_callback(PATH, monitor, save_last):
         save_last=save_last
     )
     return checkpoint
+
+
+def get_distance_matrix(x, samples, K, device):
+    x = DataLoader(TensorDataset(x), batch_size=4096, shuffle=False)
+    samples = DataLoader(TensorDataset(samples), batch_size=4096, shuffle=False)
+    output = []
+    _x = list(enumerate(x))
+    for i in trange(len(_x)):
+        points = _x[i][1][0]
+        points = points.to(device)
+        temp = []
+        _samples = list(enumerate(samples))
+        for j in range(len(_samples)):
+            sample = _samples[j][1][0]
+            sample = sample.to(device)
+            _temp = torch.cdist(points.unsqueeze(
+                0), sample.unsqueeze(0)).squeeze(0)
+            temp.append(torch.sort(_temp, dim=1)[0][:, -min(K, _temp.shape[1]):].cpu())
+        temp = torch.cat(temp, axis=-1)
+        temp = torch.mean(torch.sort(temp, dim=1)[0][:, -K:], dim=1)
+        output.append(temp)
+    return torch.cat(output)

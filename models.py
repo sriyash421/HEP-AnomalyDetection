@@ -24,7 +24,7 @@ class Classifier(nn.Module):
 
     def init_weights(self, param):
         if type(param) == nn.Linear:
-            torch.nn.init.xavier_uniform_(param.weight.data)
+            torch.nn.init.xavier_normal_(param.weight.data)
 
     def forward(self, inputs):
         outputs = [self.activation_fn(inputs)]

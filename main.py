@@ -6,6 +6,7 @@ from utils import read_config, get_early_stopper, get_checkpoint_callback, print
 from train import Model
 from dataset import DatasetModule
 import numpy as np
+torch.set_num_threads(torch.get_num_threads())
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--config", default="config.ini")
@@ -75,9 +76,6 @@ if __name__ == "__main__":
                              logger=logger,
                              max_epochs=params["EPOCHS"],
                              gpus=gpus,
-                             #  gradient_clip_val=1.0,
-                             track_grad_norm=2,
-                             #  print_nan_grads=True
                              )
         '''training the model'''
         trainer.fit(model, dataset)

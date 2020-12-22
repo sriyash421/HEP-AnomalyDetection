@@ -5,7 +5,7 @@ import pytorch_lightning as pl
 from torch.utils.data import random_split
 from models import Classifier, AutoEncoder
 import numpy as np
-from utils import print_dict
+from utils import print_dict, get_distance_matrix
 import tqdm
 from sklearn.metrics import roc_auc_score, accuracy_score, mean_squared_error, log_loss, roc_curve
 import matplotlib.pyplot as plt
@@ -140,14 +140,14 @@ class Model(pl.LightningModule):
         return torch.sort(x)[0][-self.K:].mean()
 
     def plot(self, scores, target, name):
-        mc_sig_index = target == 1
-        mc_bkg_index = target == 0
+        mc_sig_index = np.where(target == 1)
+        mc_bkg_index = np.where(target == 0)
         false_pos_rate, true_pos_rate, _ = roc_curve(target, scores)
         plt.subplot(2, 1, 1)
         plt.title("score distribution")
-        plt.hist(scores[mc_sig_index], bins=40, label="Signal",
+        plt.hist(scores[mc_sig_index], bins='auto', label="Signal",
                  range=[0, 1], histtype=u"step")
-        plt.hist(scores[mc_bkg_index], bins=40,
+        plt.hist(scores[mc_bkg_index], bins='auto',
                  label="Background", range=[0, 1], histtype=u"step")
         plt.yscale("log")
         plt.ylabel("#events")
@@ -166,14 +166,20 @@ class Model(pl.LightningModule):
     def anomaly_detection(self, stats):
         print(self.training_features.shape)
         print(self.test_features.shape)
-        training_dists = torch.tensor(
-            [self.get_mean_dist(x, self.training_features) for x in tqdm.tqdm(self.training_features[:1000])])
+        # training_dists = torch.tensor(
+        #     [self.get_mean_dist(x, self.training_features) for x in tqdm.tqdm(self.training_features)])
+        training_dists = get_distance_matrix(
+            self.training_features, self.training_features, self.K, self.device)
         train_mean, train_std = torch.mean(
             training_dists), torch.std(training_dists)
-        d_train_samples = torch.tensor(
-            [self.get_mean_dist(x, self.test_features) for x in tqdm.tqdm(self.test_features[:1001])])
-        d_test_samples = torch.tensor(
-            [self.get_mean_dist(x, self.test_features) for x in tqdm.tqdm(self.test_features[:1002])])
+        # d_train_samples = torch.tensor(
+        #     [self.get_mean_dist(x, self.training_features) for x in tqdm.tqdm(self.test_features)])
+        d_train_samples = get_distance_matrix(
+            self.test_features, self.training_features, self.K, self.device)
+        # d_test_samples = torch.tensor(
+        #     [self.get_mean_dist(x, self.test_features) for x in tqdm.tqdm(self.test_features)])
+        d_test_samples = get_distance_matrix(
+            self.test_features, self.test_features, self.K, self.device)
         delta_trad = torch.tensor(
             [(d_train-train_mean)/(train_std+1e-8) for d_train in d_train_samples])
         delta_new = torch.tensor([(d_test**(-self.m)-d_train**(-self.m))/(
@@ -186,15 +192,11 @@ class Model(pl.LightningModule):
         targets = (self.test_target == 0).float().cpu()
 
         anomaly_new = ((scores_new.cpu() >= 0.5) ==
-                       targets[:1001]).float().mean()
+                       targets).float().mean()
         anomaly_trad = ((scores_trad.cpu() >= 0.5) ==
-                        targets[:1001]).float().mean()
+                        targets).float().mean()
 
         stats["Anomaly_new Acc"] = anomaly_new
         stats["Anomaly_trad Acc"] = anomaly_trad
-        targets[0] = 1
-        targets[10] = 1
-        scores_trad = np.random.rand(scores_trad.shape[0])
-        scores_new = np.random.rand(scores_new.shape[0])
-        self.plot(scores_trad, targets[:1001], "Trad")
-        self.plot(scores_new, targets[:1001], "New")
+        self.plot(scores_trad.numpy(), targets.numpy(), "Trad")
+        self.plot(scores_new.numpy(), targets.numpy(), "New")
