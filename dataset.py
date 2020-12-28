@@ -87,10 +87,30 @@ class DatasetModule(pl.LightningDataModule):
                 tree_labels = pd.DataFrame({"target": np.zeros(len(tree_pd))})
                 tree_pd = pd.concat([tree_pd, tree_labels], axis=1)
                 sig_df = pd.concat([sig_df, tree_pd], ignore_index=True)
-            return sig_df, bkg_df, sig_df["target"].to_frame(), bkg_df["target"].to_frame()
 
+        if self.channel == "emu" or self.channel == "mue":
+            sig_id = np.invert(sig_df["tau_pt"]==0)
+            sig_channel = sig_df[sig_id]
+            bkg_id = np.invert(bkg_df["tau_pt"]==0)
+            bkg_channel = bkg_df[bkg_id]
 
+        elif self.channel == "etau" or self.channel == "taue":
+            sig_id = np.invert(sig_df["mu_pt"]==0)
+            sig_channel = sig_df[sig_id]
+            bkg_id = np.invert(bkg_df["mu_pt"]==0)
+            bkg_channel = bkg_df[bkg_id]
 
+        elif self.channel == "mutau" or self.channel == "taumu":
+            sig_id = np.invert(sig_df["e_pt"]==0)
+            sig_channel = sig_df[sig_id]
+            bkg_id = np.invert(bkg_df["e_pt"]==0)
+            bkg_channel = bkg_df[bkg_id]
+
+        self.sig = sig_channel.to_numpy()
+        self.bkg = bkg_channel.to_numpy()
+        print(f"Signal samples: {self.sig.shape}")
+        print(f"Background samples: {self.bkg.shape}")
+        self.input_size = self.sig.shape[1]-1
 
     def setup(self, stage):
         '''

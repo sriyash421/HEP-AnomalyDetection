@@ -6,6 +6,7 @@ from utils import read_config, get_early_stopper, get_checkpoint_callback, print
 from train import Model
 from dataset import DatasetModule
 import numpy as np
+from toy_data import ToyDatasetModule
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--config", default="config.ini")
@@ -25,7 +26,7 @@ if __name__ == "__main__":
             os.makedirs(params["LOG_DIR"])
         if not os.path.exists(params["CHECKPOINTS_DIR"]):
             os.makedirs(params["CHECKPOINTS_DIR"])
-        
+
         dataset = DatasetModule(root_path=params["ROOT_PATH"],
                                 campaigns=params["CAMPAIGN"],
                                 channel=params["CHANNEL"],
@@ -78,3 +79,69 @@ if __name__ == "__main__":
                              gpus=gpus)
         '''training the model'''
         trainer.fit(model, dataset)
+        result = trainer.test()
+        print(result)
+
+    if params["JOB_TYPE"] == "toy":
+        if not os.path.exists(params["SAVE_DIR"]):
+            os.makedirs(params["SAVE_DIR"])
+        if not os.path.exists(params["LOG_DIR"]):
+            os.makedirs(params["LOG_DIR"])
+        if not os.path.exists(params["CHECKPOINTS_DIR"]):
+            os.makedirs(params["CHECKPOINTS_DIR"])
+
+        dataset = ToyDatasetModule(root_path=params["ROOT_PATH"],
+                                norm_array=params["NORM_ARRAY"],
+                                sig_sum=params["SIG_SUM"],
+                                bkg_sum=params["BKG_SUM"],
+                                bkg_list=params["BKG_LIST"],
+                                sig_list=params["SIG_LIST"],
+                                test_ratio=params["TEST_SPLIT"],
+                                val_ratio=params["VAL_SPLIT"],
+                                batch_size=params["BATCH_SIZE"])
+
+        early_stopping, logger, model_checkpoint = None, None, None
+        if params["EARLY_STOP"]:
+            early_stopping = get_early_stopper(
+                monitor=params["ES_MONITOR"], min_delta=params["ES_DELTA"], patience=params["ES_PATIENCE"], mode=params["ES_MODE"])
+
+        if params["SAVE_TB_LOGS"]:
+            logger = pl.loggers.TensorBoardLogger(
+                save_dir=params["LOG_DIR"], log_graph=False)
+
+        if params["SAVE_MODEL"]:
+            model_checkpoint = get_checkpoint_callback(
+                PATH=params["CHECKPOINTS_DIR"], monitor='val_loss', save_last=params["CHECK_EPOCH"])  #
+
+        model = Model(
+            momentum=params["MOMENTUM"],
+            nesterov=params["NESTEROV"],
+            learn_rate=params["LEARN_RATE"],
+            learn_rate_decay=params["LEARN_RATE_DECAY"],
+            sig_class_weight=params["SIG_CLASS_WEIGHT"],
+            bkg_class_weight=params["BKG_CLASS_WEIGHT"],
+            optimizer=params["OPTIMIZER"],
+            classifier_nodes=params["CLASSIFIER_NODES"],
+            encoder_nodes=params["ENCODER_NODES"],
+            dropout=params["DROPOUT"],
+            activation=params["ACTIVATION"],
+            input_size=params["NUM_FEATURES"],
+            output_size=len(params["BKG_LIST"]),
+            save_tb_logs=params["SAVE_TB_LOGS"],
+            log_path=params["LOG_DIR"],
+            K=params["K"]
+        )
+
+        trainer = pl.Trainer(callbacks=[early_stopping,
+                                        model_checkpoint],
+                             logger=logger,
+                             max_epochs=params["EPOCHS"],
+                             gpus=gpus,
+                             #  gradient_clip_val=1.0,
+                             track_grad_norm=2,
+                             #  print_nan_grads=True
+                             )
+        '''training the model'''
+        trainer.fit(model, dataset)
+        result = trainer.test()
+        print(result)

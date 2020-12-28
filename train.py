@@ -228,6 +228,7 @@ class Model(pl.LightningModule):
         delta_new = torch.tensor([(d_test**(-self.m)-d_train**(-self.m))/(
             d_train**(int(-self.m/2))+1e-8) for d_train in d_train_samples])
         rms_trad, rms_new = (delta_trad**2).mean(), (delta_new**2).mean()
+<<<<<<< Updated upstream
         score_trad = 0.5*(1+torch.erf(delta_trad*(1.0/(rms_trad*(2**0.5)))))
         score_new = 0.5*(1+torch.erf(delta_new*(1.0/(rms_new*(2**0.5)))))
         score_new = torch.mul(score_trad, score_new)**0.5
@@ -241,3 +242,27 @@ class Model(pl.LightningModule):
         stats["Anomaly_trad Acc"] = anomaly_trad
         self.plot(scores_trad, target, "Trad")
         self.plot(scores_new, target, "New")
+=======
+        scores_trad = 0.5*(1+torch.erf(delta_trad*(1.0/(rms_trad*(2**0.5)))))
+        scores_new = 0.5*(1+torch.erf(delta_new*(1.0/(rms_new*(2**0.5)))))
+        scores_new = torch.mul(scores_trad, scores_new)**0.5
+
+        targets = (self.test_target == 0).float().cpu()
+        print("\n\n")
+        print(targets)
+
+        anomaly_new = ((scores_new.cpu() >= 0.5) ==
+                       targets[:1001]).float().mean()
+        anomaly_trad = ((scores_trad.cpu() >= 0.5) ==
+                        targets[:1001]).float().mean()
+
+        stats["Anomaly_new Acc"] = anomaly_new
+        stats["Anomaly_trad Acc"] = anomaly_trad
+        targets[0] = 1
+        targets[10] = 1
+        scores_trad = np.random.rand(scores_trad.shape[0])
+        scores_new = np.random.rand(scores_new.shape[0])
+        print(f"scores_trad, scores_new: {scores_trad.shape}, {scores_new.shape}")
+        self.plot(scores_trad, targets[:1001], "Trad")
+        self.plot(scores_new, targets[:1001], "New")
+>>>>>>> Stashed changes
