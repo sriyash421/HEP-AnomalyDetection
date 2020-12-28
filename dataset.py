@@ -34,20 +34,6 @@ class DatasetModule(pl.LightningDataModule):
         self.val_ratio = val_ratio
         self.batch_size = batch_size
 
-    # def read_data(self, class_list, campaign, df, target=None):
-    #     labels = pd.DataFrame()
-    #     for class_type in class_list:
-    #         events = uproot.open(
-    #             f"{self.root_path}/merged/{campaign}/{class_type}.root")
-    #         tree = events[events.keys()[0]]
-    #         features = tree.keys()
-    #         tree_pd = tree.pandas.df(features)
-    #         df = pd.concat([df, tree_pd], ignore_index=True)
-    #         if target is not None:
-    #             labels = pd.concat([labels, pd.DataFrame(
-    #                 {"target": target*np.ones(len(tree_pd))})], ignore_index=True)
-    #     return df, labels
-
     def prepare_data(self):
         '''
         return:
