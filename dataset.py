@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader, TensorDataset, ConcatDataset
 import pytorch_lightning as pl
 from torch.utils.data import random_split
 from utils import print_dict
+from sklearn.preprocessing import StandardScaler
 
 
 class DatasetModule(pl.LightningDataModule):
@@ -52,14 +53,15 @@ class DatasetModule(pl.LightningDataModule):
 
         for campaign in self.campaigns:
             print(f"Reading campaign: {campaign}...")
-            for i,bkg in enumerate(self.bkg_list):
+            for i, bkg in enumerate(self.bkg_list):
                 events = uproot.open(
                     f"{self.root_path}/merged/{campaign}/{bkg}.root"
                 )
                 tree = events[events.keys()[0]]
                 features = tree.keys()
-                tree_pd = tree.pandas.df(self.selected_features)
-                tree_labels = pd.DataFrame({"target": np.ones(len(tree_pd) * (i+1))})
+                tree_pd = tree.pandas.df(features)
+                tree_labels = pd.DataFrame(
+                    {"target": np.ones(len(tree_pd)) * (i+1)})
                 tree_pd = pd.concat([tree_pd, tree_labels], axis=1)
                 bkg_df = pd.concat([bkg_df, tree_pd], ignore_index=True)
 
@@ -69,7 +71,7 @@ class DatasetModule(pl.LightningDataModule):
                 )
                 tree = events[events.keys()[0]]
                 features = tree.keys()
-                tree_pd = tree.pandas.df(self.selected_features)
+                tree_pd = tree.pandas.df(features)
                 tree_labels = pd.DataFrame({"target": np.zeros(len(tree_pd))})
                 tree_pd = pd.concat([tree_pd, tree_labels], axis=1)
                 sig_df = pd.concat([sig_df, tree_pd], ignore_index=True)
@@ -94,7 +96,7 @@ class DatasetModule(pl.LightningDataModule):
 
         self.sig = sig_channel.to_numpy()
         self.bkg = bkg_channel.to_numpy()
-        print(f"Signal samples: {self.sig.shape}")
+        print(f"Signal samples: {self.sig[0],self.sig.shape}")
         print(f"Background samples: {self.bkg.shape}")
         self.input_size = self.sig.shape[1]-1
 
@@ -103,8 +105,8 @@ class DatasetModule(pl.LightningDataModule):
         function to create tensordatasets by splitting according to ratio and samplers
         '''
         if self.norm_array:
-            self.sig[:, :-1] = norweight(self.sig[:, :-1], self.sig_sum)
-            self.bkg[:, :-1] = norweight(self.bkg[:, :-1], self.bkg_sum)
+            self.sig[:, :-1], self.bkg[:, :-
+                                       1] = normalise_features(self.sig[:, :-1], self.bkg[:, :-1])
         np.random.shuffle(self.sig)
         np.random.shuffle(self.bkg)
         bkg_train, bkg_val, bkg_test = self.split_sets(
@@ -143,10 +145,18 @@ class DatasetModule(pl.LightningDataModule):
                           num_workers=8, shuffle=False)
         return test
 
-def norweight(weight_array, norm=1000):
+
+# def norweight(weight_array, norm=1000):
+#     print(f"Normalising the arrays")
+#     new = weight_array.copy()
+#     total_weight = np.sum(new)
+#     frac = norm / total_weight
+#     new = frac * new
+#     return new
+
+def normalise_features(sig, bkg):
     print(f"Normalising the arrays")
-    new = weight_array.copy()
-    total_weight = np.sum(new)
-    frac = norm / total_weight
-    new = frac * new
-    return new
+    data = np.concatenate([sig, bkg], axis=0)
+    scaler = StandardScaler()
+    scaler.fit(data)
+    return scaler.transform(sig), scaler.transform(bkg)

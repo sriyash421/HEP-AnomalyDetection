@@ -7,6 +7,7 @@ from train import Model
 from dataset import DatasetModule
 import numpy as np
 from toy_data import ToyDatasetModule
+torch.set_num_threads(torch.get_num_threads())
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--config", default="config.ini")
@@ -38,7 +39,6 @@ if __name__ == "__main__":
                                 test_ratio=params["TEST_SPLIT"],
                                 val_ratio=params["VAL_SPLIT"],
                                 batch_size=params["BATCH_SIZE"])
-        dataset.prepare_data()
 
         early_stopping, logger, model_checkpoint = None, None, None
         if params["EARLY_STOP"]:
@@ -65,18 +65,19 @@ if __name__ == "__main__":
             encoder_nodes=params["ENCODER_NODES"],
             dropout=params["DROPOUT"],
             activation=params["ACTIVATION"],
-            input_size=dataset.input_size,
+            input_size=params["NUM_FEATURES"],
             output_size=len(params["BKG_LIST"]),
             save_tb_logs=params["SAVE_TB_LOGS"],
             log_path=params["LOG_DIR"],
-            K=params["K"],
+            K=params["K"]
         )
 
-        trainer = pl.Trainer(early_stop_callback=early_stopping,
-                             checkpoint_callback=model_checkpoint,
+        trainer = pl.Trainer(callbacks=[early_stopping,
+                                        model_checkpoint],
                              logger=logger,
                              max_epochs=params["EPOCHS"],
-                             gpus=gpus)
+                             gpus=gpus,
+                             )
         '''training the model'''
         trainer.fit(model, dataset)
         result = trainer.test()
