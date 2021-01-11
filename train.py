@@ -9,7 +9,7 @@ from utils import print_dict, get_distance_matrix
 import tqdm
 from sklearn.metrics import roc_auc_score, accuracy_score, mean_squared_error, log_loss, roc_curve
 import matplotlib.pyplot as plt
-
+import pandas as pd
 
 class Model(pl.LightningModule):
 
@@ -77,7 +77,7 @@ class Model(pl.LightningModule):
         classifier_loss = self.classifier_loss_fn(
             predictions, (targets-1).long())
         recon_loss = self.encoder_loss_fn(features, recon_features)
-        total_loss = classifier_loss+recon_loss
+        total_loss = 0.1*classifier_loss+0.9*recon_loss
         accuracy = (torch.argmax(predictions, dim=1)
                     == (targets-1)).float().mean()
         return total_loss, classifier_loss, recon_loss, accuracy, latent_rep
@@ -140,8 +140,8 @@ class Model(pl.LightningModule):
         return torch.sort(x)[0][-self.K:].mean()
 
     def plot(self, scores, target, name):
-        mc_sig_index = np.where(target == 1)
-        mc_bkg_index = np.where(target == 0)
+        mc_sig_index = np.where(target == 0)
+        mc_bkg_index = np.where(target == 1)
         false_pos_rate, true_pos_rate, _ = roc_curve(target, scores)
         plt.subplot(2, 1, 1)
         plt.title("score distribution")
@@ -162,6 +162,8 @@ class Model(pl.LightningModule):
             facecolor="none", edgecolor="black", boxstyle="square"))
         plt.tight_layout()
         plt.savefig(f"{self.log_path}/report_{name}.png")
+        plt.clf()
+
 
     def anomaly_detection(self, stats):
         print(self.training_features.shape)
@@ -187,16 +189,26 @@ class Model(pl.LightningModule):
         rms_trad, rms_new = (delta_trad**2).mean(), (delta_new**2).mean()
         scores_trad = 0.5*(1+torch.erf(delta_trad*(1.0/(rms_trad*(2**0.5)))))
         scores_new = 0.5*(1+torch.erf(delta_new*(1.0/(rms_new*(2**0.5)))))
-        scores_new = torch.mul(scores_trad, scores_new)**0.5
-
-        targets = (self.test_target == 0).float().cpu()
+        scores_comb = torch.mul(scores_trad, scores_new)**0.5
+        # targets = (self.test_target == 0).float().cpu()
+        targets = self.test_target
+        # print(self.test_target)
 
         anomaly_new = ((scores_new.cpu() >= 0.5) ==
                        targets).float().mean()
         anomaly_trad = ((scores_trad.cpu() >= 0.5) ==
                         targets).float().mean()
-
+        #renamed the combined score to be comb instead of new
+        anomaly_comb = ((scores_comb.cpu() >= 0.5) ==
+                        targets).float().mean()
         stats["Anomaly_new Acc"] = anomaly_new
         stats["Anomaly_trad Acc"] = anomaly_trad
         self.plot(scores_trad.numpy(), targets.numpy(), "Trad")
         self.plot(scores_new.numpy(), targets.numpy(), "New")
+        self.plot(scores_comb.numpy(), targets.numpy(), "Comb")
+        temp_df = pd.DataFrame()
+        temp_df["targets"] = targets
+        temp_df["new_scores"] = scores_new
+        temp_df["trad_scores"] = scores_trad
+        temp_df["comb_scores"] = scores_comb
+        temp_df.to_csv("score_table.csv")
