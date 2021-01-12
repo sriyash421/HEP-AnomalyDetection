@@ -191,7 +191,7 @@ class Model(pl.LightningModule):
         scores_new = 0.5*(1+torch.erf(delta_new*(1.0/(rms_new*(2**0.5)))))
         scores_comb = torch.mul(scores_trad, scores_new)**0.5
         # targets = (self.test_target == 0).float().cpu()
-        targets = self.test_target
+        targets = self.test_target.float().cpu()
         # print(self.test_target)
 
         anomaly_new = ((scores_new.cpu() >= 0.5) ==
