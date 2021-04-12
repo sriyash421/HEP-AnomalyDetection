@@ -61,7 +61,8 @@ class DatasetModule(pl.LightningDataModule):
                 )
                 tree = events[events.keys()[0]]
                 features = tree.keys()
-                tree_pd = tree.pandas.df(features).loc[:int(len(tree_pd)*self.data_ratio)]
+                tree_pd = tree.pandas.df(features)
+                tree_pd = tree_pd.loc[:int(len(tree_pd)*self.data_ratio)]
                 tree_labels = pd.DataFrame(
                     {"target": np.ones(len(tree_pd)) * (i+1)})
                 tree_pd = pd.concat([tree_pd, tree_labels], axis=1)
@@ -74,6 +75,7 @@ class DatasetModule(pl.LightningDataModule):
                 tree = events[events.keys()[0]]
                 features = tree.keys()
                 tree_pd = tree.pandas.df(features).loc[:int(len(tree_pd)*self.data_ratio)]
+                tree_pd = tree_pd.loc[:int(len(tree_pd)*self.data_ratio)]
                 tree_labels = pd.DataFrame({"target": np.zeros(len(tree_pd))})
                 tree_pd = pd.concat([tree_pd, tree_labels], axis=1)
                 sig_df = pd.concat([sig_df, tree_pd], ignore_index=True)

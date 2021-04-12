@@ -3,6 +3,8 @@ import torch.nn as nn
 
 
 class Classifier(nn.Module):
+    """Class to build model for classifier
+    """
     def __init__(self, nodes, dropout, activation, input_size, output_size):
         super(Classifier, self).__init__()
         self.nodes = nodes
@@ -38,6 +40,8 @@ class Classifier(nn.Module):
 
 
 class AutoEncoder(nn.Module):
+    """Class to build model for autoencoder
+    """
     def __init__(self, nodes, dropout, activation, input_size):
         super(AutoEncoder, self).__init__()
         self.nodes = nodes

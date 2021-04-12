@@ -221,4 +221,4 @@ class Model(pl.LightningModule):
         temp_df["trad_scores"] = scores_trad
         temp_df["comb_scores"] = scores_comb
         temp_df.to_csv(f"{self.log_path}/score_table.csv")
-        print_dict(stats)
+        print_dict(stats, "FINAL STATS")
