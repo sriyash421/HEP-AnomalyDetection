@@ -21,7 +21,8 @@ class DatasetModule(pl.LightningDataModule):
                  sig_list,
                  test_ratio,
                  val_ratio,
-                 batch_size):
+                 batch_size,
+                 data_ratio):
         super().__init__()
         self.root_path = root_path
         self.campaigns = campaigns
@@ -34,6 +35,7 @@ class DatasetModule(pl.LightningDataModule):
         self.test_ratio = test_ratio
         self.val_ratio = val_ratio
         self.batch_size = batch_size
+        self.data_ratio = data_ratio
 
     def prepare_data(self):
         '''
@@ -59,7 +61,7 @@ class DatasetModule(pl.LightningDataModule):
                 )
                 tree = events[events.keys()[0]]
                 features = tree.keys()
-                tree_pd = tree.pandas.df(features)
+                tree_pd = tree.pandas.df(features).loc[:int(len(tree_pd)*self.data_ratio)]
                 tree_labels = pd.DataFrame(
                     {"target": np.ones(len(tree_pd)) * (i+1)})
                 tree_pd = pd.concat([tree_pd, tree_labels], axis=1)
@@ -71,12 +73,35 @@ class DatasetModule(pl.LightningDataModule):
                 )
                 tree = events[events.keys()[0]]
                 features = tree.keys()
-                tree_pd = tree.pandas.df(features)
+                tree_pd = tree.pandas.df(features).loc[:int(len(tree_pd)*self.data_ratio)]
                 tree_labels = pd.DataFrame({"target": np.zeros(len(tree_pd))})
                 tree_pd = pd.concat([tree_pd, tree_labels], axis=1)
                 sig_df = pd.concat([sig_df, tree_pd], ignore_index=True)
-        self.sig = sig_df.to_numpy(dtype=np.float64)
-        self.bkg = bkg_df.to_numpy(dtype=np.float64)
+        
+        if self.channel == "emu" or self.channel == "mue":
+            sig_id = np.invert(sig_df["tau_pt"]==0)
+            sig_channel = sig_df[sig_id]
+            bkg_id = np.invert(bkg_df["tau_pt"]==0)
+            bkg_channel = bkg_df[bkg_id]
+
+        elif self.channel == "etau" or self.channel == "taue":
+            sig_id = np.invert(sig_df["mu_pt"]==0)
+            sig_channel = sig_df[sig_id]
+            bkg_id = np.invert(bkg_df["mu_pt"]==0)
+            bkg_channel = bkg_df[bkg_id]
+
+        elif self.channel == "mutau" or self.channel == "taumu":
+            sig_id = np.invert(sig_df["e_pt"]==0)
+            sig_channel = sig_df[sig_id]
+            bkg_id = np.invert(bkg_df["e_pt"]==0)
+            bkg_channel = bkg_df[bkg_id]
+        
+        else:
+            sig_channel = sig_df
+            bkg_channel = bkg_df
+
+        self.sig = sig_channel.to_numpy(dtype=np.float64)
+        self.bkg = bkg_channel.to_numpy(dtype=np.float64)
         print(f"Signal samples: {self.sig.shape}")
         print(f"Background samples: {self.bkg.shape}")
         self.input_size = self.sig.shape[1]-1
@@ -126,14 +151,6 @@ class DatasetModule(pl.LightningDataModule):
                           num_workers=8, shuffle=False)
         return test
 
-
-# def norweight(weight_array, norm=1000):
-#     print(f"Normalising the arrays")
-#     new = weight_array.copy()
-#     total_weight = np.sum(new)
-#     frac = norm / total_weight
-#     new = frac * new
-#     return new
 
 def normalise_features(sig, bkg):
     print(f"Normalising the arrays")

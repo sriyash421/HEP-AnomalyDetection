@@ -37,7 +37,8 @@ if __name__ == "__main__":
                                 sig_list=params["SIG_LIST"],
                                 test_ratio=params["TEST_SPLIT"],
                                 val_ratio=params["VAL_SPLIT"],
-                                batch_size=params["BATCH_SIZE"])
+                                batch_size=params["BATCH_SIZE"],
+                                data_ratio=params["DATA_RATIO"])
 
         early_stopping, logger, model_checkpoint = None, None, None
         if params["EARLY_STOP"]:
@@ -57,8 +58,8 @@ if __name__ == "__main__":
             nesterov=params["NESTEROV"],
             learn_rate=params["LEARN_RATE"],
             learn_rate_decay=params["LEARN_RATE_DECAY"],
-            sig_class_weight=params["SIG_CLASS_WEIGHT"],
-            bkg_class_weight=params["BKG_CLASS_WEIGHT"],
+            classifier_wt=params["CLASSIFIER_WT"],
+            encoder_wt=params["ENCODER_WT"],
             optimizer=params["OPTIMIZER"],
             classifier_nodes=params["CLASSIFIER_NODES"],
             encoder_nodes=params["ENCODER_NODES"],
@@ -68,7 +69,8 @@ if __name__ == "__main__":
             output_size=len(params["BKG_LIST"]),
             save_tb_logs=params["SAVE_TB_LOGS"],
             log_path=params["LOG_DIR"],
-            K=params["K"]
+            K=params["K"],
+            inf_batch_size=params["INF_BATCH"]
         )
 
         trainer = pl.Trainer(callbacks=[early_stopping,

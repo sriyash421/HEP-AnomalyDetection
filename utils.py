@@ -40,10 +40,6 @@ def read_config(filename="config.ini"):
     config["LOG_DIR"] = os.path.join(config["SAVE_DIR"], "logs")
     config["CHECKPOINTS_DIR"] = os.path.join(
         config["SAVE_DIR"], "checkpoints")
-    # elif config["JOB_TYPE"] == "test":
-    #     config["LOAD_DIR"] = str(temp["load_dir"])
-    #     config["RESULTS_DIR"] = str(temp["results_dir"])
-    #     config["LOG_DIR"] = os.path.join(config["RESULTS_DIR"], "logs")
 
     config["ROOT_PATH"] = str(temp["root_path"])
     config["NUM_FEATURES"] = int(temp["num_features"])
@@ -57,6 +53,7 @@ def read_config(filename="config.ini"):
     config["TEST_SPLIT"] = float(temp["test_rate"])
     config["VAL_SPLIT"] = float(temp["val_split"])
     config["BATCH_SIZE"] = int(temp["batch_size"])
+    config["DATA_RATIO"] = float(temp["data_ratio"])
 
     config["EARLY_STOP"] = True if temp["use_early_stop"] == "true" else False
     config["ES_MONITOR"] = str(temp["early_stop_monitor"])
@@ -75,14 +72,15 @@ def read_config(filename="config.ini"):
     config["NESTEROV"] = True if temp["nesterov"] == "true" else False
     config["LEARN_RATE"] = float(temp["learn_rate"])
     config["LEARN_RATE_DECAY"] = float(temp["learn_rate_decay"])
-    config["SIG_CLASS_WEIGHT"] = float(temp["sig_class_weight"])
-    config["BKG_CLASS_WEIGHT"] = float(temp["bkg_class_weight"])
+    config["CLASSIFIER_WT"] = float(temp["classifier_weight"])
+    config["ENCODER_WT"] = float(temp["encoder_weight"])
     config["OPTIMIZER"] = str(temp["optimizer"])
     config["CLASSIFIER_NODES"] = json.loads(temp["classifier_nodes"])
     config["ENCODER_NODES"] = json.loads(temp["encoder_nodes"])
     config["DROPOUT"] = float(temp["dropout_rate"])
     config["ACTIVATION"] = str(temp["activation_fn"])
     config["K"] = int(temp["k_value"])
+    config["INF_BATCH"] = int(temp["inf_batch"])
 
     print_dict(config, "Config")
     return config
@@ -116,9 +114,9 @@ def get_checkpoint_callback(PATH, monitor, save_last):
     return checkpoint
 
 
-def get_distance_matrix(x, samples, K, device):
-    x = DataLoader(TensorDataset(x), batch_size=4096, shuffle=False)
-    samples = DataLoader(TensorDataset(samples), batch_size=4096, shuffle=False)
+def get_distance_matrix(batch_size, x, samples, K, device):
+    x = DataLoader(TensorDataset(x), batch_size=batch_size, shuffle=False)
+    samples = DataLoader(TensorDataset(samples), batch_size=batch_size, shuffle=False)
     output = []
     _x = list(enumerate(x))
     for i in trange(len(_x)):

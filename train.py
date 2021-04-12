@@ -1,5 +1,6 @@
 import os
 import torch
+import pandas as pd
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 from torch.utils.data import random_split
@@ -8,6 +9,7 @@ import numpy as np
 from utils import print_dict, get_distance_matrix
 import tqdm
 from sklearn.metrics import roc_auc_score, accuracy_score, mean_squared_error, log_loss, roc_curve
+from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 
 
@@ -18,8 +20,8 @@ class Model(pl.LightningModule):
                  nesterov,
                  learn_rate,
                  learn_rate_decay,
-                 sig_class_weight,
-                 bkg_class_weight,
+                 classifier_wt,
+                 encoder_wt,
                  optimizer,
                  classifier_nodes,
                  encoder_nodes,
@@ -29,7 +31,8 @@ class Model(pl.LightningModule):
                  output_size,
                  save_tb_logs,
                  log_path,
-                 K
+                 K,
+                 inf_batch_size
                  ):
         '''create a training class'''
         super(pl.LightningModule, self).__init__()
@@ -43,13 +46,15 @@ class Model(pl.LightningModule):
         self.nesterov = nesterov
         self.learn_rate = learn_rate
         self.learn_rate_decay = learn_rate_decay
-        self.sig_class_weight = sig_class_weight
-        self.bkg_class_weight = bkg_class_weight
+        self.classifier_wt = classifier_wt
+        self.encoder_wt = encoder_wt
         self.optimizer_ = optimizer
         self.encoder_loss_fn = torch.nn.MSELoss()
         self.classifier_loss_fn = torch.nn.CrossEntropyLoss()
         self.K = K
+        self.inf_batch_size = inf_batch_size
         self.log_path = log_path
+        self.num_bkg = output_size
 
     def forward(self, input):
         '''get output'''
@@ -77,7 +82,7 @@ class Model(pl.LightningModule):
         classifier_loss = self.classifier_loss_fn(
             predictions, (targets-1).long())
         recon_loss = self.encoder_loss_fn(features, recon_features)
-        total_loss = classifier_loss+recon_loss
+        total_loss = self.classifier_wt*classifier_loss+self.encoder_wt*recon_loss
         accuracy = (torch.argmax(predictions, dim=1)
                     == (targets-1)).float().mean()
         return total_loss, classifier_loss, recon_loss, accuracy, latent_rep
@@ -132,7 +137,24 @@ class Model(pl.LightningModule):
     def test_epoch_end(self, outputs):
         self.test_features = torch.cat(self.test_features, axis=0)
         self.test_target = torch.cat(self.test_target, axis=0)
-        self.anomaly_detection({})
+        self.analysis()
+        self.anomaly_detection()
+    
+    def analysis(self):
+        features = TSNE(n_components=2).fit_transform(self.test_features.cpu().numpy())
+        target = self.test_target.cpu().numpy()
+        mc_sig_index = np.where(target == 0)
+        mc_bkg_index = [np.where(target == i+1) for i in range(self.num_bkg)]
+        plt.figure()
+        plt.scatter(features[mc_sig_index,0],features[mc_sig_index,1], label="Signal")
+        for i in range(self.num_bkg):
+            plt.scatter(features[mc_bkg_index[i],0],features[mc_bkg_index[i],1], label=f"Background_{i+1}")
+        plt.title("Hidden features")
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(f"{self.log_path}/report_features.png")
+        plt.clf()
+        
 
     def get_mean_dist(self, x, samples):
         x = samples-x
@@ -145,9 +167,9 @@ class Model(pl.LightningModule):
         false_pos_rate, true_pos_rate, _ = roc_curve(target, scores)
         plt.subplot(2, 1, 1)
         plt.title("score distribution")
-        plt.hist(scores[mc_sig_index], bins='auto', label="Signal",
+        plt.hist(scores[mc_sig_index], bins=40, label="Signal",
                  range=[0, 1], histtype=u"step")
-        plt.hist(scores[mc_bkg_index], bins='auto',
+        plt.hist(scores[mc_bkg_index], bins=40,
                  label="Background", range=[0, 1], histtype=u"step")
         plt.yscale("log")
         plt.ylabel("#events")
@@ -162,23 +184,16 @@ class Model(pl.LightningModule):
             facecolor="none", edgecolor="black", boxstyle="square"))
         plt.tight_layout()
         plt.savefig(f"{self.log_path}/report_{name}.png")
+        plt.clf()
 
-    def anomaly_detection(self, stats):
-        print(self.training_features.shape)
-        print(self.test_features.shape)
-        # training_dists = torch.tensor(
-        #     [self.get_mean_dist(x, self.training_features) for x in tqdm.tqdm(self.training_features)])
-        training_dists = get_distance_matrix(
+    def anomaly_detection(self):
+        training_dists = get_distance_matrix( self.inf_batch_size,
             self.training_features, self.training_features, self.K, self.device)
         train_mean, train_std = torch.mean(
             training_dists), torch.std(training_dists)
-        # d_train_samples = torch.tensor(
-        #     [self.get_mean_dist(x, self.training_features) for x in tqdm.tqdm(self.test_features)])
-        d_train_samples = get_distance_matrix(
+        d_train_samples = get_distance_matrix( self.inf_batch_size,
             self.test_features, self.training_features, self.K, self.device)
-        # d_test_samples = torch.tensor(
-        #     [self.get_mean_dist(x, self.test_features) for x in tqdm.tqdm(self.test_features)])
-        d_test_samples = get_distance_matrix(
+        d_test_samples = get_distance_matrix( self.inf_batch_size,
             self.test_features, self.test_features, self.K, self.device)
         delta_trad = torch.tensor(
             [(d_train-train_mean)/(train_std+1e-8) for d_train in d_train_samples])
@@ -187,16 +202,23 @@ class Model(pl.LightningModule):
         rms_trad, rms_new = (delta_trad**2).mean(), (delta_new**2).mean()
         scores_trad = 0.5*(1+torch.erf(delta_trad*(1.0/(rms_trad*(2**0.5)))))
         scores_new = 0.5*(1+torch.erf(delta_new*(1.0/(rms_new*(2**0.5)))))
-        scores_new = torch.mul(scores_trad, scores_new)**0.5
+        scores_comb = torch.mul(scores_trad, scores_new)**0.5
 
         targets = (self.test_target == 0).float().cpu()
 
-        anomaly_new = ((scores_new.cpu() >= 0.5) ==
+        anomaly_comb = ((scores_comb.cpu() >= 0.5) ==
                        targets).float().mean()
         anomaly_trad = ((scores_trad.cpu() >= 0.5) ==
                         targets).float().mean()
 
-        stats["Anomaly_new Acc"] = anomaly_new
-        stats["Anomaly_trad Acc"] = anomaly_trad
+        stats = {"Anomaly_new Acc": anomaly_trad, "Anomaly_trad Acc": anomaly_trad}
         self.plot(scores_trad.numpy(), targets.numpy(), "Trad")
         self.plot(scores_new.numpy(), targets.numpy(), "New")
+        self.plot(scores_comb.numpy(), targets.numpy(), "Comb")
+        temp_df = pd.DataFrame()
+        temp_df["targets"] = targets
+        temp_df["new_scores"] = scores_new
+        temp_df["trad_scores"] = scores_trad
+        temp_df["comb_scores"] = scores_comb
+        temp_df.to_csv(f"{self.log_path}/score_table.csv")
+        print_dict(stats)
