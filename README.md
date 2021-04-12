@@ -1,10 +1,21 @@
 # HEP-AnomalyDetection
 
-## How to run:
-1. Install dependencies: `pip install -e .`
-2. Run the training script: `python main.py --config <path to config file>`
+### To install required packages :
+```bash
+pip install -e .
+```
 
-## Results:
+### Dataset: :
+``` bash
+- add root files to {root_path}/merged/{campaigns}/
+```
+
+### To train :
+```bash
+python main.py --num_gpus (num_gpus) --config (path to config file)
+```
+
+### Results:
 - ROC Curve
 - TSNE plot for latent space
 - Tensorboard logs: To generate plots `tensorboard --logdir <path to log dir>`
