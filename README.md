@@ -21,3 +21,7 @@ python main.py --num_gpus (num_gpus) --config (path to config file)
 - Tensorboard logs: To generate plots `tensorboard --logdir <path to log dir>`
 
 #### Note: Sample config file is provided: config.ini
+
+### Current feature plot:
+
+![Feature plot](assets/report_features.png)
